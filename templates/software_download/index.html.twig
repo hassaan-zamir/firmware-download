@@ -1,0 +1,172 @@
+{% extends 'base.html.twig' %}
+
+{% block stylesheets %}
+<link rel="stylesheet" href="{{ asset('css/software-download.css') }}">
+{% endblock %}
+
+{% block body %}
+<div id="software-download">
+    <div class="card">
+        <div class="section-title">
+            <h1 class="title"><span class="bold">Update the software for your</span><br>CarPlay / Android Auto MMI</h1>
+        </div>
+
+        <form id="softwareForm" class="software-form mt-10" onsubmit="return false;">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="version">Software Version</label>
+                    <input type="text" id="version" placeholder="Your software version*" required>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="mcuVersion">MCU Version Not Required</label>
+                    <input type="text" id="mcuVersion" placeholder="Not Required" disabled class="disabled-input">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="hwVersion">HW Version</label>
+                    <input type="text" id="hwVersion" placeholder="Your HW version*" required>
+                </div>
+            </div>
+
+            <div class="button-row">
+                <button type="submit" id="checkBtn" class="btn-primary" onclick="checkSoftware()">Check</button>
+                <span class="tooltip-icon" title="Enter your current software version to check if there is an update available. You can find your current software in MMI settings > System > System/firmware version.">
+                    <span class="mdi mdi-information"></span>
+                </span>
+            </div>
+
+            <div id="resultAlert" class="alert" style="display: none;">
+                <p id="resultMsg"></p>
+            </div>
+
+            <p class="mt-3">
+                <a href="#" id="softwareModal" onclick="showModal(); return false;" style="text-decoration: underline;">What is my current software?</a>
+            </p>
+
+            <div class="alert alert-warning">
+                <strong>Warning!!!</strong><br>
+                <p>
+                    Entering an incorrect software number and uploading it to another version of MMI will brick the MMI.<br>
+                    In most cases, this is a reversible process, but impossible to perform without the assistance of our support.<br>
+                    BimmerTech is not responsible for errors in software uploading by customers due to uploading the incorrect version.<br>
+                    After this step, replacement under warranty cannot be considered.
+                </p>
+            </div>
+        </form>
+    </div>
+
+    <div class="card mt-4">
+        <a href="https://newshop.testshop1.bimmer-tech.net/" target="_blank" class="btn-primary">Go back to the shop</a>
+        <p class="mt-3 text-caption">
+            BMW and MINI are registered trademarks of Bayerische Motoren Werke AG. BimmerTech is not
+            affiliated with BMW AG in any way, and is not authorized by BMW AG to act as an official
+            distributor or representative.
+        </p>
+    </div>
+</div>
+
+<!-- Modal -->
+<div id="imageModal" class="modal-overlay" style="display: none;" onclick="closeModal(event)">
+    <div class="modal-content">
+        <button class="modal-close" onclick="hideModal()">
+            <span class="mdi mdi-close-thick"></span>
+        </button>
+        <img src="{{ asset('images/mmi_software_version.jpg') }}" alt="Where to find your software version" width="100%">
+    </div>
+</div>
+{% endblock %}
+
+{% block javascripts %}
+<script>
+    let isSubmitting = false;
+
+    async function checkSoftware() {
+        const version = document.getElementById('version').value.trim();
+        const hwVersion = document.getElementById('hwVersion').value.trim();
+        const resultAlert = document.getElementById('resultAlert');
+        const resultMsg = document.getElementById('resultMsg');
+        const form = document.getElementById('softwareForm');
+
+        // Simple validation
+        if (!version) {
+            resultAlert.style.display = 'block';
+            resultAlert.className = 'alert alert-error';
+            resultMsg.innerHTML = 'Software Version is required.';
+            return;
+        }
+        if (!hwVersion) {
+            resultAlert.style.display = 'block';
+            resultAlert.className = 'alert alert-error';
+            resultMsg.innerHTML = 'HW Version is required.';
+            return;
+        }
+
+        if (isSubmitting) return;
+        isSubmitting = true;
+        form.classList.add('loading');
+
+        try {
+            const response = await fetch('{{ path("api_software_version") }}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    version: version,
+                    mcuVersion: '',
+                    hwVersion: hwVersion
+                })
+            });
+
+            const data = await response.json();
+            resultAlert.style.display = 'block';
+
+            if (data.versionExist) {
+                resultAlert.className = 'alert alert-success';
+                let html = data.msg;
+                if (data.st) {
+                    html += ' <a href="' + data.st + '" target="_blank" class="download-link">ST VERSION</a>';
+                }
+                if (data.gd) {
+                    html += ' <a href="' + data.gd + '" target="_blank" class="download-link">GD VERSION</a>';
+                }
+                resultMsg.innerHTML = html;
+            } else {
+                resultAlert.className = 'alert alert-error';
+                resultMsg.innerHTML = data.msg || 'There was a problem identifying your software. Contact us for help.';
+            }
+        } catch (error) {
+            console.error(error);
+            resultAlert.style.display = 'block';
+            resultAlert.className = 'alert alert-error';
+            resultMsg.innerHTML = 'Failed to fetch software details. Please try again.';
+        } finally {
+            isSubmitting = false;
+            form.classList.remove('loading');
+        }
+    }
+
+    // Allow form submission with Enter key
+    document.getElementById('softwareForm').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            checkSoftware();
+        }
+    });
+
+    function showModal() {
+        document.getElementById('imageModal').style.display = 'flex';
+    }
+
+    function hideModal() {
+        document.getElementById('imageModal').style.display = 'none';
+    }
+
+    function closeModal(event) {
+        if (event.target === document.getElementById('imageModal')) {
+            hideModal();
+        }
+    }
+</script>
+{% endblock %}
